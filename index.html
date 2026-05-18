@@ -72,6 +72,28 @@
             <input id="pgnFile" type="file" accept=".pgn,.txt,text/plain,application/vnd.chess-pgn" />
             <label for="pgnInput">PGN партии</label>
             <textarea id="pgnInput" spellcheck="false"></textarea>
+            <details class="ai-settings">
+              <summary>Настройки ИИ-ментора</summary>
+              <p>Демо-вариант: API-ключ вводится в браузере и не сохраняется в коде проекта. Для публичного продукта лучше использовать backend-прокси.</p>
+              <div class="form-grid">
+                <div>
+                  <label for="aiProvider">Провайдер</label>
+                  <select id="aiProvider">
+                    <option value="openai" selected>OpenAI</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="aiModel">Модель</label>
+                  <input id="aiModel" type="text" value="gpt-4o-mini" />
+                </div>
+              </div>
+              <label for="aiApiKey">API-ключ</label>
+              <input id="aiApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+              <label class="checkbox-row">
+                <input id="useAiMentor" type="checkbox" />
+                <span>Генерировать объяснения через ИИ</span>
+              </label>
+            </details>
             <div class="form-actions">
               <button class="button primary" type="submit">Разобрать партию</button>
               <button class="button ghost" id="sampleButton" type="button">Вставить пример</button>

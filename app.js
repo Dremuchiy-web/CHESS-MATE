@@ -53,6 +53,9 @@ const moveCount = document.getElementById("moveCount");
 const mistakeCount = document.getElementById("mistakeCount");
 const score = document.getElementById("score");
 const progressCards = document.getElementById("progressCards");
+const aiApiKey = document.getElementById("aiApiKey");
+const aiModel = document.getElementById("aiModel");
+const useAiMentor = document.getElementById("useAiMentor");
 const pieceMap = {
   wK: "♔", wQ: "♕", wR: "♖", wB: "♗", wN: "♘", wP: "♙",
   bK: "♚", bQ: "♛", bR: "♜", bB: "♝", bN: "♞", bP: "♟"
@@ -72,13 +75,16 @@ sampleButton.addEventListener("click", () => {
   pgnInput.focus();
 });
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const pgn = pgnInput.value.trim();
   const rating = document.getElementById("playerRating").value;
   const playerSide = document.getElementById("playerSide").value;
   const analysis = analyzeGame(pgn, rating, playerSide);
   renderAnalysis(analysis);
+  if (useAiMentor.checked) {
+    await enrichAnalysisWithAi(analysis, pgn);
+  }
 });
 
 function parseMoves(pgn) {
@@ -176,6 +182,85 @@ function renderAnalysis(analysis) {
   `).join("");
 
   renderProgress(analysis.mistakes);
+}
+
+async function enrichAnalysisWithAi(analysis, pgn) {
+  const key = aiApiKey.value.trim();
+  if (!key) {
+    showAiMessage("Введите API-ключ, чтобы включить ИИ-ментора.", "error");
+    return;
+  }
+
+  showAiMessage("ИИ-ментор готовит персональные объяснения...", "note");
+  try {
+    const aiMistakes = await requestAiMentor(analysis, pgn, key, aiModel.value.trim() || "gpt-4o-mini");
+    analysis.mistakes = analysis.mistakes.map((mistake, index) => ({
+      ...mistake,
+      explanation: aiMistakes[index]?.explanation || mistake.explanation,
+      exercise: aiMistakes[index]?.exercise || mistake.exercise,
+      type: aiMistakes[index]?.type || mistake.type
+    }));
+    renderAnalysis(analysis);
+    showAiMessage("Объяснения обновлены через ИИ-ментора.", "note");
+  } catch (error) {
+    showAiMessage(`ИИ недоступен: ${error.message}. Показаны локальные объяснения.`, "error");
+  }
+}
+
+async function requestAiMentor(analysis, pgn, key, model) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.35,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "Ты шахматный ИИ-тренер CHESS:MATE для любителей 1000-1800. Объясняй ошибки простым русским языком, без длинных вариантов. Возвращай только JSON."
+        },
+        {
+          role: "user",
+          content: buildAiPrompt(analysis, pgn)
+        }
+      ]
+    })
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error?.message || "ошибка API");
+  }
+
+  const content = payload.choices?.[0]?.message?.content;
+  const parsed = JSON.parse(content);
+  if (!Array.isArray(parsed.mistakes)) {
+    throw new Error("ИИ вернул неверный формат");
+  }
+  return parsed.mistakes;
+}
+
+function buildAiPrompt(analysis, pgn) {
+  const compactPgn = pgn.slice(0, 3500);
+  const mistakes = analysis.mistakes.map((mistake, index) => ({
+    index,
+    moveNumber: mistake.moveNumber,
+    side: mistake.side,
+    move: mistake.move,
+    detectedType: mistake.type,
+    rating: mistake.rating
+  }));
+  return `PGN партии:\n${compactPgn}\n\nНайденные проблемные ходы:\n${JSON.stringify(mistakes, null, 2)}\n\nВерни JSON строго такого вида: {"mistakes":[{"type":"тип ошибки","explanation":"2-3 предложения как живой тренер: почему ход плох и какой принцип нарушен","exercise":"одно конкретное упражнение для исправления этой ошибки"}]}. Количество элементов должно совпадать с количеством найденных ходов.`;
+}
+
+function showAiMessage(message, kind) {
+  const existing = results.querySelector(".ai-note, .ai-error");
+  if (existing) existing.remove();
+  results.insertAdjacentHTML("afterbegin", `<div class="${kind === "error" ? "ai-error" : "ai-note"}">${message}</div>`);
 }
 
 function renderProgress(items) {
