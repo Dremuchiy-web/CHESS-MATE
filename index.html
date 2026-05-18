@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CHESS:MATE — персональный ИИ-тьютор</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <nav class="nav">
+        <div class="brand"><span>♞</span> CHESS:MATE</div>
+        <a href="#analyzer" class="nav-link">Разобрать партию</a>
+      </nav>
+      <section class="hero-grid">
+        <div>
+          <p class="eyebrow">ИИ-тьютор для шахматистов 1000–1800</p>
+          <h1>Понимай ошибки, а не просто смотри лучший ход</h1>
+          <p class="hero-text">Загрузи PGN партии и получи понятный разбор ключевых ошибок, персональные упражнения и карту прогресса по слабым местам.</p>
+          <div class="hero-actions">
+            <a href="#analyzer" class="button primary">Начать анализ</a>
+            <a href="#features" class="button secondary">Что входит в MVP</a>
+          </div>
+        </div>
+        <div class="coach-card">
+          <div class="coach-header">ИИ-тренер</div>
+          <p>«Ты не просто потерял пешку — ты ослабил короля и дал сопернику темп. Давай потренируем защиту после рокировки».</p>
+          <div class="coach-metrics">
+            <span>3–5 ошибок</span>
+            <span>упражнения</span>
+            <span>прогресс</span>
+          </div>
+        </div>
+      </section>
+    </header>
+
+    <main>
+      <section id="features" class="section features">
+        <article><strong>01</strong><h3>Загрузка партии</h3><p>Вставь PGN из Chess.com или Lichess.</p></article>
+        <article><strong>02</strong><h3>Анализ ошибок</h3><p>Прототип выделяет 3–5 моментов, где вероятны тактические или стратегические проблемы.</p></article>
+        <article><strong>03</strong><h3>Понятное объяснение</h3><p>Советы написаны как комментарии тренера, а не как сухая оценка движка.</p></article>
+        <article><strong>04</strong><h3>Упражнения</h3><p>Каждая ошибка превращается в персональную тренировку.</p></article>
+      </section>
+
+      <section id="analyzer" class="section analyzer">
+        <div class="section-heading">
+          <p class="eyebrow">MVP pipeline</p>
+          <h2>analyze_game → explain_mistake → generate_exercise</h2>
+          <p>Демо работает локально в браузере и имитирует связку шахматного движка и LLM-объяснений.</p>
+        </div>
+        <div class="workspace">
+          <form id="analysisForm" class="panel input-panel">
+            <div class="form-grid">
+              <div>
+                <label for="playerRating">Рейтинг игрока</label>
+                <select id="playerRating">
+                  <option value="1000–1200">1000–1200</option>
+                  <option value="1200–1500" selected>1200–1500</option>
+                  <option value="1500–1800">1500–1800</option>
+                </select>
+              </div>
+              <div>
+                <label for="playerSide">За кого играл</label>
+                <select id="playerSide">
+                  <option value="auto" selected>Авто из PGN</option>
+                  <option value="white">Белые</option>
+                  <option value="black">Чёрные</option>
+                </select>
+              </div>
+            </div>
+            <label for="pgnFile">Загрузить PGN-файл</label>
+            <input id="pgnFile" type="file" accept=".pgn,.txt,text/plain,application/vnd.chess-pgn" />
+            <label for="pgnInput">PGN партии</label>
+            <textarea id="pgnInput" spellcheck="false"></textarea>
+            <div class="form-actions">
+              <button class="button primary" type="submit">Разобрать партию</button>
+              <button class="button ghost" id="sampleButton" type="button">Вставить пример</button>
+            </div>
+          </form>
+          <section class="panel results-panel">
+            <div class="result-topline">
+              <div><span id="moveCount">0</span><small>ходов найдено</small></div>
+              <div><span id="mistakeCount">0</span><small>ошибок</small></div>
+              <div><span id="score">—</span><small>фокус тренировки</small></div>
+            </div>
+            <div id="results" class="empty-state">Вставь PGN и нажми «Разобрать партию».</div>
+          </section>
+        </div>
+      </section>
+
+      <section class="section progress-section">
+        <div class="section-heading">
+          <p class="eyebrow">История прогресса</p>
+          <h2>Какие ошибки исправляешь, а какие остаются</h2>
+        </div>
+        <div id="progressCards" class="progress-cards"></div>
+      </section>
+    </main>
+
+    <footer class="footer">CHESS:MATE MVP · Персональные объяснения + упражнения по ошибкам</footer>
+    <script src="app.js"></script>
+  </body>
+</html>
