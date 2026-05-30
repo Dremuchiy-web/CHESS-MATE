@@ -60,6 +60,8 @@ p { color: var(--muted); line-height: 1.65; }
   .sample-button-wrapper { width: 100%; }
   .sample-button-wrapper > label { display: none; }
   .sample-button-wrapper > button { width: 100%; }
+  .ai-toggle input { width: 36px; height: 36px; }
+  .ai-toggle { font-size: 1.1rem; }
 }
 .ai-toggle {
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.2), rgba(215, 255, 99, 0.15));
