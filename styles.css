@@ -57,6 +57,7 @@ p { color: var(--muted); line-height: 1.65; }
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   font-weight: 700;
   font-size: 1.05rem;
@@ -66,8 +67,8 @@ p { color: var(--muted); line-height: 1.65; }
   transform: translateY(-2px);
 }
 .ai-toggle input {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   accent-color: var(--accent);
   margin-left: 0;
 }
@@ -81,7 +82,7 @@ label { display: block; font-weight: 800; margin: 16px 0 8px; }
 select, textarea, input[type="file"], input[type="text"], input[type="password"] { width: 100%; border: 1px solid var(--line); background: #0f1420; color: var(--text); border-radius: 18px; padding: 14px; outline: none; }
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa6bd' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%239aa6bd' stroke-width='1.5' d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 36px;
