@@ -97,7 +97,7 @@ const pieceMap = {
 };
 
 pgnInput.value = samplePgn;
-renderProgress(mistakeTypes);
+renderProgress([]);
 
 pgnFile.addEventListener("change", async (event) => {
   const [file] = event.target.files;
