@@ -521,7 +521,7 @@ async function enrichAnalysisWithAi(analysis, pgn) {
 
   showAiMessage("ИИ-ментор анализирует партию...", "note");
   try {
-    const aiMistakes = await requestAiMentor(analysis, pgn, key, aiModel.value.trim() || "gpt-5.4-mini");
+    const aiMistakes = await requestAiMentor(analysis, pgn, key, "gpt-5.4-mini");
     if (!aiMistakes || !Array.isArray(aiMistakes)) {
       throw new Error("ИИ вернул неверный формат данных");
     }
