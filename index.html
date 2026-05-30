@@ -69,9 +69,16 @@
                 </select>
               </div>
             </div>
-            <label for="pgnFile">Загрузить PGN-файл</label>
-            <input id="pgnFile" type="file" accept=".pgn,.txt,text/plain,application/vnd.chess-pgn" />
-            <button class="button ghost" id="sampleButton" type="button" style="margin-top: 8px;">Вставить пример</button>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <div style="flex: 1;">
+                <label for="pgnFile">Загрузить PGN-файл</label>
+                <input id="pgnFile" type="file" accept=".pgn,.txt,text/plain,application/vnd.chess-pgn" style="height: 54px; box-sizing: border-box;" />
+              </div>
+              <div style="display: flex; flex-direction: column; justify-content: flex-end;">
+                <label style="visibility: hidden;">&nbsp;</label>
+                <button class="button ghost" id="sampleButton" type="button" style="white-space: nowrap; height: 54px; box-sizing: border-box;">Вставить пример</button>
+              </div>
+            </div>
             <label for="pgnInput">PGN партии</label>
             <textarea id="pgnInput" spellcheck="false"></textarea>
             <label for="aiApiKey">API-ключ для ИИ-ментора</label>
@@ -80,7 +87,7 @@
               <input id="useAiMentor" type="checkbox" />
               <span>🤖 Генерировать объяснения через ИИ</span>
             </label>
-            <button class="button primary" type="submit" style="width: 100%; padding: 18px 20px;">Разобрать партию</button>
+            <button class="button primary" type="submit" style="width: 100%; padding: 18px 20px; height: 60px; box-sizing: border-box; font-size: 1.1rem;">Разобрать партию</button>
           </form>
           <section class="panel results-panel">
             <div class="result-topline">
