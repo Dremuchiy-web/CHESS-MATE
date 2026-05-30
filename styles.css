@@ -37,6 +37,7 @@ p { color: var(--muted); line-height: 1.65; }
 .button { border: 0; border-radius: 16px; padding: 14px 20px; color: var(--text); text-decoration: none; font-weight: 800; cursor: pointer; transition: transform 0.18s ease, border-color 0.18s ease; }
 .button:hover { transform: translateY(-2px); }
 .primary { background: linear-gradient(135deg, var(--accent), #72ffb6); color: #10131a; }
+.primary:hover { background: linear-gradient(135deg, #c4ff5f, #5affa8); }
 .secondary, .ghost { background: transparent; border: 1px solid var(--line); }
 .coach-card, .panel, .features article, .progress-card { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(18px); }
 .coach-card { border-radius: 34px; padding: 34px; transform: rotate(1.5deg); }
