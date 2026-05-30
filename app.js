@@ -519,6 +519,11 @@ async function enrichAnalysisWithAi(analysis, pgn) {
     return;
   }
 
+  if (window.location.hostname.includes('github.io')) {
+    showAiMessage("⚠️ ИИ-ментор недоступен на GitHub Pages. Для работы ИИ нужен локальный прокси-сервер. Локальный анализ будет работать.", "error");
+    return;
+  }
+
   showAiMessage("ИИ-ментор анализирует партию...", "note");
   try {
     const aiMistakes = await requestAiMentor(analysis, pgn, key, "gpt-5.4-mini");
