@@ -60,15 +60,15 @@ p { color: var(--muted); line-height: 1.65; }
   justify-content: center;
   gap: 12px;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.3rem;
 }
 .ai-toggle:hover {
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.3), rgba(215, 255, 99, 0.25));
   transform: translateY(-2px);
 }
 .ai-toggle input {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   accent-color: var(--accent);
   margin-left: 0;
 }
