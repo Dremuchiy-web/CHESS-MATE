@@ -52,7 +52,7 @@ p { color: var(--muted); line-height: 1.65; }
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.2), rgba(215, 255, 99, 0.15));
   border: 2px solid var(--accent-2);
   border-radius: 16px;
-  padding: 16px 20px;
+  padding: 16px 20px 16px 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -69,6 +69,7 @@ p { color: var(--muted); line-height: 1.65; }
   width: 24px;
   height: 24px;
   accent-color: var(--accent);
+  margin-left: 0;
 }
 .ai-toggle span {
   color: var(--text);
