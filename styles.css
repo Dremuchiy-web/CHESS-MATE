@@ -55,8 +55,11 @@ p { color: var(--muted); line-height: 1.65; }
   .hero-grid { grid-template-columns: 1fr; }
   .features { grid-template-columns: 1fr 1fr; }
   .form-grid { grid-template-columns: 1fr; }
-  .file-sample-row { flex-direction: column; }
-  .file-sample-row > div { width: 100%; }
+  .file-sample-row { flex-direction: column; align-items: stretch; }
+  .file-input-wrapper { width: 100%; }
+  .sample-button-wrapper { width: 100%; }
+  .sample-button-wrapper > label { display: none; }
+  .sample-button-wrapper > button { width: 100%; }
 }
 .ai-toggle {
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.2), rgba(215, 255, 99, 0.15));
