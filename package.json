@@ -1,0 +1,13 @@
+{
+  "name": "chessmate-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for Codex Sale API",
+  "main": "proxy.js",
+  "scripts": {
+    "start": "node proxy.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}

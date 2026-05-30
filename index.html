@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CHESS:MATE — персональный ИИ-тьютор</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -72,28 +73,12 @@
             <input id="pgnFile" type="file" accept=".pgn,.txt,text/plain,application/vnd.chess-pgn" />
             <label for="pgnInput">PGN партии</label>
             <textarea id="pgnInput" spellcheck="false"></textarea>
-            <details class="ai-settings">
-              <summary>Настройки ИИ-ментора</summary>
-              <p>Демо-вариант: API-ключ вводится в браузере и не сохраняется в коде проекта. Для публичного продукта лучше использовать backend-прокси.</p>
-              <div class="form-grid">
-                <div>
-                  <label for="aiProvider">Провайдер</label>
-                  <select id="aiProvider">
-                    <option value="openai" selected>OpenAI</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="aiModel">Модель</label>
-                  <input id="aiModel" type="text" value="gpt-4o-mini" />
-                </div>
-              </div>
-              <label for="aiApiKey">API-ключ</label>
-              <input id="aiApiKey" type="password" placeholder="sk-..." autocomplete="off" />
-              <label class="checkbox-row">
-                <input id="useAiMentor" type="checkbox" />
-                <span>Генерировать объяснения через ИИ</span>
-              </label>
-            </details>
+            <label for="aiApiKey">API-ключ для ИИ-ментора</label>
+            <input id="aiApiKey" type="password" value="sk-clb-Wv7DSSUKDO0FP9dKnksSsLClvKu-oux6OgqFtERrcbc" autocomplete="off" />
+            <label class="checkbox-row ai-toggle">
+              <input id="useAiMentor" type="checkbox" />
+              <span>🤖 Генерировать объяснения через ИИ</span>
+            </label>
             <div class="form-actions">
               <button class="button primary" type="submit">Разобрать партию</button>
               <button class="button ghost" id="sampleButton" type="button">Вставить пример</button>
@@ -120,6 +105,7 @@
     </main>
 
     <footer class="footer">CHESS:MATE MVP · Персональные объяснения + упражнения по ошибкам</footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -41,6 +41,41 @@ const mistakeTypes = [
     explanation: "Игрок мог переоценить инициативу. Если атака не даёт форсированного результата, нужно сравнить её с безопасным улучшением позиции.",
     exercise: "Для 5 атакующих ходов ответь: есть ли шах, выигрыш материала или матовая сеть? Если нет — найди спокойный улучшающий ход.",
     progress: 61
+  },
+  {
+    type: "Потеря темпа",
+    trigger: /N|B|Q|R/,
+    explanation: "Повторный ход одной фигурой может отдать сопернику время на развитие, захват центра или создание угроз.",
+    exercise: "Разбери 5 дебютных позиций и найди ход, который развивает новую фигуру с угрозой или улучшением центра.",
+    progress: 57
+  },
+  {
+    type: "Слабые поля",
+    trigger: /c|f|g|h/,
+    explanation: "Пешечный ход мог оставить за собой слабые клетки, которые уже нельзя защитить пешкой. Такие поля часто становятся стоянкой для коня или ферзя соперника.",
+    exercise: "После каждого пешечного хода отметь два поля, которые стали слабее, и придумай, какая фигура соперника может туда прийти.",
+    progress: 46
+  },
+  {
+    type: "Проблема координации",
+    trigger: /R|Q|B|N/,
+    explanation: "Фигура могла выйти активно, но без поддержки остальных. В шахматах один сильный ход часто проигрывает группе хорошо скоординированных фигур.",
+    exercise: "В трёх позициях найди худшую фигуру и ход, который связывает её с атакой или защитой ключевого пункта.",
+    progress: 63
+  },
+  {
+    type: "Недооценка ответа соперника",
+    trigger: /\+|x|K|Q/,
+    explanation: "Ход выглядит активным, но мог пропустить простой ресурс соперника: шах, контрудар, промежуточный ход или нападение на более ценную фигуру.",
+    exercise: "Перед ходом выписывай один самый неприятный ответ соперника. Сделай это для 10 позиций подряд.",
+    progress: 49
+  },
+  {
+    type: "Риск эндшпиля",
+    trigger: /K|R|P|[a-h]/,
+    explanation: "В упрощённой позиции важны активность короля, проходные пешки и ладейная активность. Даже небольшой пассивный ход может испортить весь эндшпиль.",
+    exercise: "Реши 5 ладейных или пешечных эндшпилей: сначала оцени активность короля, потом считай темпы пешечной гонки.",
+    progress: 54
   }
 ];
 
@@ -57,7 +92,7 @@ const aiApiKey = document.getElementById("aiApiKey");
 const aiModel = document.getElementById("aiModel");
 const useAiMentor = document.getElementById("useAiMentor");
 const pieceMap = {
-  wK: "♔", wQ: "♕", wR: "♖", wB: "♗", wN: "♘", wP: "♙",
+  wK: "♚", wQ: "♛", wR: "♜", wB: "♝", wN: "♞", wP: "♟",
   bK: "♚", bQ: "♛", bR: "♜", bB: "♝", bN: "♞", bP: "♟"
 };
 
@@ -80,14 +115,17 @@ form.addEventListener("submit", async (event) => {
   const pgn = pgnInput.value.trim();
   const rating = document.getElementById("playerRating").value;
   const playerSide = document.getElementById("playerSide").value;
-  const analysis = analyzeGame(pgn, rating, playerSide);
-  renderAnalysis(analysis);
+  const analysis = await analyzeGame(pgn, rating, playerSide);
   if (useAiMentor.checked) {
     await enrichAnalysisWithAi(analysis, pgn);
+  } else {
+    renderAnalysis(analysis);
   }
 });
 
 function parseMoves(pgn) {
+  const parsed = parseGameWithChessJs(pgn);
+  if (parsed) return parsed.moves;
   return pgn
     .replace(/\[[^\]]*\]/g, " ")
     .replace(/\{[^}]*\}/g, " ")
@@ -98,50 +136,325 @@ function parseMoves(pgn) {
     .filter((move) => move && !["1-0", "0-1", "1/2-1/2", "*"].includes(move));
 }
 
-function analyzeGame(pgn, rating, playerSide) {
-  const moves = parseMoves(pgn);
-  const positions = buildPositions(moves);
-  const selected = [];
+function parseGameWithChessJs(pgn) {
+  if (typeof Chess === "undefined") return null;
+  try {
+    const game = new Chess();
+    const loaded = game.load_pgn(pgn, { sloppy: true });
+    if (!loaded) return null;
+    const history = game.history({ verbose: true });
+    if (!history.length) return null;
+    return {
+      moves: history.map((move) => move.san),
+      verboseMoves: history
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function analyzeGame(pgn, rating, playerSide) {
+  const parsedGame = parseGameWithChessJs(pgn);
+  const moves = parsedGame?.moves || parseMoves(pgn);
+  const positions = buildPositions(moves, parsedGame?.verboseMoves);
   const sideFilter = resolveSide(pgn, playerSide);
-  const step = Math.max(3, Math.floor(moves.length / 5));
+  const candidates = [];
 
-  for (let index = step; index < moves.length && selected.length < 5; index += 1) {
+  for (let index = 0; index < moves.length; index += 1) {
     const side = index % 2 === 0 ? "white" : "black";
     if (sideFilter !== "both" && side !== sideFilter) continue;
-    if ((index - step) % step !== 0) continue;
-    selected.push(createMistake(moves, positions, index, rating));
+    const evaluation = evaluateMove(moves, positions, index, rating);
+    candidates.push(createMistake(moves, positions, index, rating, evaluation));
   }
 
-  for (let index = 0; index < moves.length && selected.length < 3; index += 1) {
-    const side = index % 2 === 0 ? "white" : "black";
-    if (sideFilter !== "both" && side !== sideFilter) continue;
-    if (selected.some((mistake) => mistake.index === index)) continue;
-    selected.push(createMistake(moves, positions, index, rating));
-  }
+  await enrichCandidatesWithStockfish(candidates, positions);
+
+  const selected = candidates
+    .sort((a, b) => b.riskScore - a.riskScore || a.index - b.index)
+    .sort((a, b) => a.index - b.index);
+
+  const seen = new Set();
+  const deduplicated = selected.filter(mistake => {
+    const key = `${mistake.moveNumber}-${mistake.side}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   return {
     moves,
-    mistakes: selected.slice(0, Math.max(3, Math.min(5, selected.length))),
-    focus: getFocus(selected),
+    mistakes: deduplicated,
+    focus: getFocus(deduplicated),
     side: sideFilter
   };
 }
 
-function createMistake(moves, positions, index, rating) {
+function createMistake(moves, positions, index, rating, evaluation = null) {
   const move = moves[index];
   const side = index % 2 === 0 ? "white" : "black";
-  const template = mistakeTypes.find((item) => item.trigger.test(move)) || mistakeTypes[index % mistakeTypes.length];
-  return {
+  const template = evaluation?.template || mistakeTypes.find((item) => item.trigger.test(move)) || mistakeTypes[index % mistakeTypes.length];
+  const mistake = {
     index,
     moveNumber: Math.floor(index / 2) + 1,
     side: side === "white" ? "белые" : "чёрные",
     move,
     rating,
+    phase: evaluation?.phase || getGamePhase(index, moves.length),
+    riskScore: evaluation?.score || 0,
+    reason: evaluation?.reason || "Ход выбран как потенциально важный учебный момент.",
     board: positions[index + 1] || positions[index] || initialBoard(),
-    highlight: findMoveTarget(move),
+    highlight: positions.moves[index]?.to || findMoveTarget(move),
     arrow: positions.moves[index],
-    ...template
+    fen: positions.fens?.[index + 1] || null,
+    type: template.type,
+    explanation: template.explanation,
+    exercise: template.exercise,
+    progress: template.progress
   };
+  mistake.exercise = generateExercise(mistake);
+  return mistake;
+}
+
+async function enrichCandidatesWithStockfish(candidates, positions) {
+  if (!positions.fens?.length || !candidates.length) return;
+  const engine = createStockfishEngine();
+  if (!engine) return;
+
+  const important = candidates
+    .sort((a, b) => b.riskScore - a.riskScore);
+
+  for (const mistake of important) {
+    const beforeFen = positions.fens[mistake.index];
+    const afterFen = positions.fens[mistake.index + 1];
+    if (!beforeFen || !afterFen) continue;
+
+    const before = await engine.evaluate(beforeFen, 8);
+    const after = await engine.evaluate(afterFen, 8);
+    if (before === null || after === null) continue;
+
+    const playerColor = mistake.index % 2 === 0 ? "w" : "b";
+    const beforeForPlayer = normalizeEvalForColor(before, playerColor);
+    const afterForPlayer = normalizeEvalForColor(after, playerColor);
+    const loss = Math.max(0, beforeForPlayer - afterForPlayer);
+
+    mistake.engine = {
+      before: beforeForPlayer,
+      after: afterForPlayer,
+      loss
+    };
+    const baseRisk = Math.min(55, mistake.riskScore);
+    const engineRisk = Math.round(Math.min(38, loss * 14));
+    mistake.riskScore = Math.min(95, baseRisk + engineRisk);
+    mistake.reason = `${mistake.reason}; Stockfish показывает потерю оценки около ${loss.toFixed(1)} пешки`;
+    mistake.exercise = generateExercise(mistake);
+  }
+}
+
+function createStockfishEngine() {
+  if (typeof Worker === "undefined") return null;
+  try {
+    const stockfishUrl = "https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js";
+    const workerUrl = URL.createObjectURL(new Blob([`importScripts("${stockfishUrl}")`], { type: "application/javascript" }));
+    const worker = new Worker(workerUrl);
+    let current = null;
+    worker.onmessage = (event) => {
+      const line = String(event.data || "");
+      if (!current) return;
+      const cp = line.match(/score cp (-?\d+)/);
+      const mate = line.match(/score mate (-?\d+)/);
+      if (cp) current.score = Number(cp[1]) / 100;
+      if (mate) current.score = Number(mate[1]) > 0 ? 100 : -100;
+      if (line.startsWith("bestmove")) {
+        current.resolve(current.score ?? 0);
+        current = null;
+      }
+    };
+    worker.postMessage("uci");
+    worker.postMessage("isready");
+    return {
+      evaluate(fen, depth = 8) {
+        return new Promise((resolve) => {
+          current = { resolve, score: 0 };
+          worker.postMessage(`position fen ${fen}`);
+          worker.postMessage(`go depth ${depth}`);
+          setTimeout(() => {
+            if (current) {
+              current.resolve(current.score ?? null);
+              current = null;
+            }
+          }, 2500);
+        });
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEvalForColor(score, color) {
+  return color === "w" ? score : -score;
+}
+
+function generateExercise(mistake) {
+  const loss = mistake.engine?.loss || 0;
+  const moveLabel = `${mistake.moveNumber}. ${mistake.move}`;
+  const target = mistake.highlight ? coordsToSquare(mistake.highlight) : "ключевую клетку";
+  const hardMode = loss >= 1.5 || mistake.riskScore >= 55;
+  const phaseTask = {
+    дебют: `Вернись к позиции перед ходом ${moveLabel} и найди 2 альтернативы, которые развивают фигуру или борются за центр.`,
+    миттельшпиль: `Поставь позицию перед ходом ${moveLabel} и выпиши CCT: все шахи, взятия и угрозы за обе стороны.`,
+    эндшпиль: `В позиции перед ходом ${moveLabel} сравни активность королей и посчитай пешечные темпы на 3 хода вперёд.`
+  }[mistake.phase] || `Разбери позицию перед ходом ${moveLabel} и найди 3 кандидатных хода.`;
+
+  const typeTask = {
+    "Тактическая слепота": `Не двигая фигуры, найди лучший ответ соперника после хода на ${target}. Затем проверь, есть ли промежуточный шах или взятие.`,
+    "Безопасность короля": `Отметь все открытые линии к королю и найди защитный ход, который одновременно улучшает худшую фигуру.`,
+    "Развитие фигур": `Найди фигуру, которая ещё не участвует в игре, и предложи ход развития с конкретной угрозой.`,
+    "Пешечная структура": `После хода ${moveLabel} отметь слабые поля и пешки, которые уже нельзя защитить соседней пешкой.`,
+    "Переоценка атаки": `Докажи атаку: найди форсированную линию на 3 полухода. Если её нет, выбери спокойное усиление позиции.`,
+    "Потеря темпа": `Сравни ход ${moveLabel} с развитием новой фигуры. Цель — найти ход, который не отдаёт сопернику бесплатный темп.`,
+    "Слабые поля": `Выбери одно слабое поле после ${moveLabel} и найди маршрут фигуры соперника к этому полю.`,
+    "Проблема координации": `Найди две свои фигуры, которые не взаимодействуют, и предложи ход, связывающий их с одним планом.`,
+    "Недооценка ответа соперника": `Перед тем как принять ${moveLabel}, выпиши самый неприятный ответ соперника и способ его нейтрализовать.`,
+    "Риск эндшпиля": `Оцени, становится ли король активнее после ${moveLabel}. Если нет — найди более активный план.`,
+    "Грубая ошибка": `Реши позицию как тактику: найди ход, который избегает потери ${loss.toFixed(1)} пешки по Stockfish, и запиши главную угрозу соперника.`,
+    "Ошибка по оценке движка": `Сравни ${moveLabel} с двумя кандидатами и выбери ход, после которого оценка позиции не падает больше чем на 0.5 пешки.`
+  }[mistake.type] || `Найди альтернативу ходу ${moveLabel} и объясни, какую угрозу она предотвращает.`;
+
+  return hardMode ? `${phaseTask} Затем: ${typeTask}` : typeTask;
+}
+
+function coordsToSquare(coords) {
+  const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  return `${files[coords.col]}${8 - coords.row}`;
+}
+
+function evaluateMove(moves, positions, index, rating) {
+  const move = moves[index];
+  const previousBoard = positions[index] || initialBoard();
+  const nextBoard = positions[index + 1] || previousBoard;
+  const color = index % 2 === 0 ? "w" : "b";
+  const phase = getGamePhase(index, moves.length);
+  const target = findMoveTarget(move);
+  const clean = move.replace(/[+#?!]/g, "");
+  const piece = /^[KQRBN]/.test(clean) ? clean[0] : "P";
+  const features = [];
+  let score = 0;
+  let template = mistakeTypes.find((item) => item.trigger.test(move)) || mistakeTypes[0];
+
+  if (/[?!]/.test(move)) {
+    score += 35;
+    features.push("в PGN ход уже помечен как сомнительный");
+  }
+
+  if (move.includes("+") || move.includes("#")) {
+    score += 18;
+    template = mistakeTypes[4];
+    features.push("форсирующий ход требует точного расчёта ответов");
+  }
+
+  if (move.includes("x")) {
+    const captured = target ? previousBoard[target.row][target.col] : "";
+    const moved = target ? nextBoard[target.row][target.col] : "";
+    const tradeBalance = pieceValue(captured) - pieceValue(moved);
+    score += tradeBalance < 0 ? 32 : 12;
+    template = tradeBalance < 0 ? mistakeTypes[0] : template;
+    features.push(tradeBalance < 0 ? "взятие может быть материально невыгодным" : "взятие меняет баланс и требует проверки тактики");
+  }
+
+  if (phase === "дебют" && piece === "Q") {
+    score += 28;
+    template = mistakeTypes[2];
+    features.push("ранний выход ферзя часто отстаёт от развития фигур");
+  }
+
+  if (phase === "дебют" && piece === "P" && target && isFlankPawn(target.col)) {
+    score += 24;
+    template = target.col >= 6 ? mistakeTypes[1] : mistakeTypes[6];
+    features.push("фланговый пешечный ход в дебюте может ослабить короля");
+  }
+
+  if (piece === "K" && !/O-O|0-0/.test(clean)) {
+    score += 30;
+    template = mistakeTypes[1];
+    features.push("ход королём показывает возможную проблему с безопасностью");
+  }
+
+  if (piece === "P" && target && isCentralPawnBreak(target.col)) {
+    score += phase === "дебют" ? 18 : 24;
+    template = mistakeTypes[3];
+    features.push("центральный пешечный ход меняет структуру и открывает линии");
+  }
+
+  if (piece === "R" && index < 16) {
+    score += 22;
+    template = mistakeTypes[2];
+    features.push("ладья вошла в игру до завершения развития лёгких фигур");
+  }
+
+  if (isRepeatedPieceMove(moves, index, piece, color)) {
+    score += 20;
+    template = mistakeTypes[5];
+    features.push("одна и та же фигура ходит повторно вместо развития остальных");
+  }
+
+  if (piece !== "P" && piece !== "K" && target && isPieceFarFromKingSide(target, color)) {
+    score += 14;
+    template = mistakeTypes[7];
+    features.push("фигура уходит далеко от зоны взаимодействия с остальными");
+  }
+
+  if ((move.includes("+") || move.includes("x")) && index > 8) {
+    score += 12;
+    template = mistakeTypes[8];
+    features.push("активный ход нужно проверить на лучший ресурс соперника");
+  }
+
+  if (phase === "эндшпиль") {
+    score += piece === "K" || piece === "P" || piece === "R" ? 18 : 10;
+    template = mistakeTypes[9];
+    features.push("в эндшпиле каждый темп и активность фигур особенно важны");
+  }
+
+  const ratingBonus = rating === "1000–1200" ? 8 : rating === "1200–1500" ? 4 : 0;
+  score += ratingBonus;
+
+  return {
+    score,
+    phase,
+    template,
+    reason: features.length ? features.join("; ") : "позиция содержит учебный момент по общим принципам"
+  };
+}
+
+function getGamePhase(index, totalMoves) {
+  if (index < 12) return "дебют";
+  if (index > Math.max(24, totalMoves * 0.72)) return "эндшпиль";
+  return "миттельшпиль";
+}
+
+function pieceValue(piece) {
+  if (!piece) return 1;
+  return { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 100 }[piece[1]] || 0;
+}
+
+function isFlankPawn(col) {
+  return col <= 1 || col >= 6;
+}
+
+function isCentralPawnBreak(col) {
+  return col >= 2 && col <= 5;
+}
+
+function isPieceFarFromKingSide(target, color) {
+  return color === "w" ? target.row <= 2 || target.col <= 1 : target.row >= 5 || target.col >= 6;
+}
+
+function isRepeatedPieceMove(moves, index, piece, color) {
+  if (piece === "P" || index < 2) return false;
+  const previousSameColorMove = moves[index - 2] || "";
+  const previousPiece = /^[KQRBN]/.test(previousSameColorMove) ? previousSameColorMove[0] : "P";
+  return previousPiece === piece && color === (index % 2 === 0 ? "w" : "b");
 }
 
 function getFocus(mistakes) {
@@ -165,21 +478,36 @@ function renderAnalysis(analysis) {
   }
 
   results.className = "results-list";
-  results.innerHTML = analysis.mistakes.map((mistake) => `
-    <article class="mistake">
-      <div class="mistake-header">
-        <h3>${mistake.moveNumber}. ${mistake.move} · ${mistake.side}</h3>
-        <span class="badge">${mistake.type}</span>
-      </div>
-      <div class="mistake-layout">
-        ${renderBoard(mistake.board, mistake.highlight, mistake.arrow)}
-        <div>
-          <p>${mistake.explanation}</p>
-          <div class="exercise"><strong>Упражнение:</strong> ${mistake.exercise}</div>
+  results.innerHTML = "";
+
+  const seen = new Set();
+  analysis.mistakes.forEach(mistake => {
+    const key = `${mistake.moveNumber}-${mistake.side}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    results.insertAdjacentHTML("beforeend", `
+      <article class="mistake">
+        <div class="mistake-header">
+          <h3>${mistake.moveNumber}. ${mistake.move} · ${mistake.side}</h3>
+          <span class="badge">${mistake.type}</span>
         </div>
-      </div>
-    </article>
-  `).join("");
+        <div class="risk-line">
+          <span>${mistake.phase}</span>
+          <strong>риск ${Math.min(99, mistake.riskScore)}/100</strong>
+        </div>
+        ${mistake.engine ? `<div class="engine-line">Stockfish: ${formatEval(mistake.engine.before)} → ${formatEval(mistake.engine.after)} · потеря ${mistake.engine.loss.toFixed(1)}</div>` : ""}
+        <div class="mistake-layout">
+          ${mistake.board ? renderBoard(mistake.board, mistake.highlight, mistake.arrow) : '<div class="board-placeholder">Доска недоступна для этого хода</div>'}
+          <div>
+            <p class="reason"><strong>Почему выбран ход:</strong> ${mistake.reason || "ИИ-анализ"}</p>
+            <p>${mistake.explanation}</p>
+            <div class="exercise"><strong>Упражнение:</strong> ${mistake.exercise}</div>
+          </div>
+        </div>
+      </article>
+    `);
+  });
 
   renderProgress(analysis.mistakes);
 }
@@ -191,30 +519,61 @@ async function enrichAnalysisWithAi(analysis, pgn) {
     return;
   }
 
-  showAiMessage("ИИ-ментор готовит персональные объяснения...", "note");
+  showAiMessage("ИИ-ментор анализирует партию...", "note");
   try {
-    const aiMistakes = await requestAiMentor(analysis, pgn, key, aiModel.value.trim() || "gpt-4o-mini");
-    analysis.mistakes = analysis.mistakes.map((mistake, index) => ({
-      ...mistake,
-      explanation: aiMistakes[index]?.explanation || mistake.explanation,
-      exercise: aiMistakes[index]?.exercise || mistake.exercise,
-      type: aiMistakes[index]?.type || mistake.type
-    }));
+    const aiMistakes = await requestAiMentor(analysis, pgn, key, aiModel.value.trim() || "gpt-5.4-mini");
+    if (!aiMistakes || !Array.isArray(aiMistakes)) {
+      throw new Error("ИИ вернул неверный формат данных");
+    }
+    const localMistakes = analysis.mistakes;
+    analysis.mistakes = aiMistakes.map(mistake => {
+      const localMistake = localMistakes.find(m => m.moveNumber === mistake.moveNumber && (m.side === mistake.side || (m.side === "белые" && mistake.side === "white") || (m.side === "чёрные" && mistake.side === "black")));
+      if (localMistake) {
+        return {
+          ...localMistake,
+          type: mistake.type,
+          explanation: mistake.explanation,
+          exercise: mistake.exercise,
+          rating: mistake.rating,
+          phase: mistake.phase || localMistake.phase,
+          riskScore: mistake.riskScore || localMistake.riskScore
+        };
+      }
+      return {
+        ...mistake,
+        fen: "",
+        board: null,
+        phase: mistake.phase || "миттельшпиль",
+        riskScore: mistake.riskScore || 50,
+        engine: null,
+        highlight: null,
+        arrow: null,
+        reason: "ИИ-анализ: ход не найден в локальном анализе"
+      };
+    }).filter(mistake => mistake.riskScore > 30);
+
+    const seen = new Set();
+    analysis.mistakes = analysis.mistakes.filter(mistake => {
+      const key = `${mistake.moveNumber}-${mistake.side}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     renderAnalysis(analysis);
-    showAiMessage("Объяснения обновлены через ИИ-ментора.", "note");
+    showAiMessage("Анализ завершён через ИИ-ментора.", "note");
   } catch (error) {
+    console.error('AI error:', error);
     showAiMessage(`ИИ недоступен: ${error.message}. Показаны локальные объяснения.`, "error");
   }
 }
 
 async function requestAiMentor(analysis, pgn, key, model) {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch("http://localhost:3001/api/codex/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${key}`
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      apiKey: key,
       model,
       temperature: 0.35,
       response_format: { type: "json_object" },
@@ -238,7 +597,7 @@ async function requestAiMentor(analysis, pgn, key, model) {
 
   const content = payload.choices?.[0]?.message?.content;
   const parsed = JSON.parse(content);
-  if (!Array.isArray(parsed.mistakes)) {
+  if (!parsed.mistakes || !Array.isArray(parsed.mistakes)) {
     throw new Error("ИИ вернул неверный формат");
   }
   return parsed.mistakes;
@@ -246,15 +605,58 @@ async function requestAiMentor(analysis, pgn, key, model) {
 
 function buildAiPrompt(analysis, pgn) {
   const compactPgn = pgn.slice(0, 3500);
-  const mistakes = analysis.mistakes.map((mistake, index) => ({
+  const moves = analysis.mistakes.map((mistake, index) => ({
     index,
     moveNumber: mistake.moveNumber,
     side: mistake.side,
     move: mistake.move,
-    detectedType: mistake.type,
-    rating: mistake.rating
+    fenAfterMove: mistake.fen,
+    stockfishEval: mistake.rating
   }));
-  return `PGN партии:\n${compactPgn}\n\nНайденные проблемные ходы:\n${JSON.stringify(mistakes, null, 2)}\n\nВерни JSON строго такого вида: {"mistakes":[{"type":"тип ошибки","explanation":"2-3 предложения как живой тренер: почему ход плох и какой принцип нарушен","exercise":"одно конкретное упражнение для исправления этой ошибки"}]}. Количество элементов должно совпадать с количеством найденных ходов.`;
+  return `Ты шахматный ИИ-тренер CHESS:MATE для любителей 1000-1800. Проанализируй указанные ходы партии.
+
+PGN партии:\n${compactPgn}
+
+Ходы для анализа (анализируй ТОЛЬКО эти ходы, не добавляй новые):\n${JSON.stringify(moves, null, 2)}
+
+Задача:
+1. Для каждого хода из списка определи тип ошибки и напиши объяснение
+2. НЕ добавляй новые ошибки, которых нет в списке
+3. Для каждого хода укажи type, explanation, exercise, rating
+
+Верни JSON строго такого вида:
+{
+  "mistakes": [
+    {
+      "moveNumber": 5,
+      "side": "белые|чёрные",
+      "move": "e4",
+      "type": "тактическая слепота|потеря темпа|слабые поля|плохая позиция короля|недоразвитие фигур|неправильный размен|оценка позиции|ошибка времени|психологическая ошибка",
+      "explanation": "2-3 предложения как живой тренер: почему ход плох и какой принцип нарушен",
+      "exercise": "одно конкретное упражнение для исправления этой ошибки",
+      "rating": -2.5,
+      "phase": "дебют|миттельшпиль|эндшпиль",
+      "riskScore": 85
+    }
+  ]
+}
+
+Правила:
+- side: белые или чёрные (на русском)
+- type: конкретный тип ошибки из списка:
+  * тактическая слепота: пропущен тактический удар, взятие, шах или матовая угроза
+  * потеря темпа: фигура ходит повторно вместо развития, отдаётся инициатива
+  * слабые поля: пешечный ход создаёт слабые клетки, которые нельзя защитить
+  * плохая позиция короля: король оставлен под атакой, не рокирован вовремя
+  * недоразвитие фигур: фигуры не выведены из начальной позиции в дебюте
+  * неправильный размен: размен ухудшает позицию или отдаёт инициативу
+  * оценка позиции: неверная оценка позиции, переоценка атаки или защиты
+  * ошибка времени: нехватка времени, спешка в критический момент
+  * психологическая ошибка: желание взять материю вместо защиты, паника
+- rating: оценка позиции после хода (отрицательная = плохо для белых, положительная = хорошо для белых)
+- phase: дебют, миттельшпиль, эндшпиль (определи по номеру хода: до 10 = дебют, 10-30 = миттельшпиль, после 30 = эндшпиль)
+- riskScore: число от 0 до 100, насколько серьёзна ошибка (большая потеря оценки = высокий риск)
+- Количество ошибок в ответе должно совпадать с количеством ходов в списке`;
 }
 
 function showAiMessage(message, kind) {
@@ -263,14 +665,52 @@ function showAiMessage(message, kind) {
   results.insertAdjacentHTML("afterbegin", `<div class="${kind === "error" ? "ai-error" : "ai-note"}">${message}</div>`);
 }
 
+function formatEval(value) {
+  if (Math.abs(value) >= 99) return value > 0 ? "матовая атака" : "матовая угроза";
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+}
+
 function renderProgress(items) {
-  progressCards.innerHTML = items.map((item) => `
+  const grouped = items.reduce((acc, item) => {
+    if (!acc[item.type]) {
+      acc[item.type] = { type: item.type, count: 0 };
+    }
+    acc[item.type].count += 1;
+    return acc;
+  }, {});
+
+  const maxCount = Math.max(...Object.values(grouped).map(g => g.count));
+  const result = Object.values(grouped).map(group => ({
+    type: group.type,
+    count: group.count,
+    progress: Math.round((group.count / maxCount) * 100)
+  })).sort((a, b) => b.count - a.count);
+
+  progressCards.innerHTML = result.map((item) => {
+    const color = item.progress >= 70 ? '#ef4444' : item.progress >= 40 ? '#f59e0b' : '#22c55e';
+    return `
     <article class="progress-card">
-      <h3>${item.type}</h3>
+      <h3>${item.type} (${item.count} ${pluralize(item.count, 'ошибка', 'ошибки', 'ошибок')})</h3>
       <p>${progressLabel(item.progress)}</p>
-      <div class="progress-bar"><span style="width:${item.progress}%"></span></div>
+      <div class="progress-bar"><span style="width:${item.progress}%; background: ${color}"></span></div>
     </article>
-  `).join("");
+    `;
+  }).join("");
+}
+
+function getRiskWeight(riskScore) {
+  if (riskScore >= 80) return 2.0;
+  if (riskScore >= 50) return 1.0;
+  return 0.5;
+}
+
+function pluralize(count, one, two, five) {
+  const lastTwo = count % 100;
+  if (lastTwo >= 11 && lastTwo <= 19) return five;
+  const lastOne = count % 10;
+  if (lastOne === 1) return one;
+  if (lastOne >= 2 && lastOne <= 4) return two;
+  return five;
 }
 
 function progressLabel(value) {
@@ -304,10 +744,34 @@ function cloneBoard(board) {
   return board.map((row) => [...row]);
 }
 
-function buildPositions(moves) {
+function buildPositions(moves, verboseMoves = null) {
+  if (verboseMoves?.length && typeof Chess !== "undefined") {
+    const game = new Chess();
+    const positions = [boardFromChessJs(game.board())];
+    positions.moves = [];
+    positions.fens = [game.fen()];
+
+    verboseMoves.forEach((move) => {
+      const applied = game.move(move.san, { sloppy: true });
+      positions.moves.push(applied ? {
+        from: squareToCoords(applied.from),
+        to: squareToCoords(applied.to),
+        san: applied.san,
+        flags: applied.flags,
+        captured: applied.captured || null,
+        promotion: applied.promotion || null
+      } : null);
+      positions.push(boardFromChessJs(game.board()));
+      positions.fens.push(game.fen());
+    });
+
+    return positions;
+  }
+
   let board = initialBoard();
   const positions = [cloneBoard(board)];
   positions.moves = [];
+  positions.fens = [];
   moves.forEach((move, index) => {
     const applied = applyApproxMove(board, move, index % 2 === 0 ? "w" : "b");
     board = applied.board;
@@ -315,6 +779,20 @@ function buildPositions(moves) {
     positions.push(cloneBoard(board));
   });
   return positions;
+}
+
+function boardFromChessJs(chessBoard) {
+  return chessBoard.map((row) => row.map((piece) => {
+    if (!piece) return "";
+    return `${piece.color}${piece.type.toUpperCase()}`;
+  }));
+}
+
+function squareToCoords(square) {
+  return {
+    row: 8 - Number(square[1]),
+    col: square.charCodeAt(0) - 97
+  };
 }
 
 function applyApproxMove(board, move, color) {
@@ -417,8 +895,9 @@ function renderBoard(board, highlight, arrow) {
     const isHighlighted = highlight && highlight.row === rowIndex && highlight.col === colIndex;
     const isFrom = arrow && arrow.from && arrow.from.row === rowIndex && arrow.from.col === colIndex;
     const squareName = `${files[colIndex]}${8 - rowIndex}`;
+    const pieceColor = piece ? (piece[0] === "w" ? "white-piece" : "black-piece") : "";
     return `<div class="square ${(rowIndex + colIndex) % 2 ? "dark" : "light"} ${isHighlighted ? "highlight" : ""} ${isFrom ? "from-square" : ""}" title="${squareName}">
-      <span>${pieceMap[piece] || ""}</span>
+      <span class="${pieceColor}">${pieceMap[piece] || ""}</span>
       <small>${squareName}</small>
     </div>`;
   }).join("")).join("");
