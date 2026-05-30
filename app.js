@@ -676,6 +676,11 @@ function formatEval(value) {
 }
 
 function renderProgress(items) {
+  if (!items || items.length === 0) {
+    progressCards.innerHTML = '<div class="empty-state">Разбери партию, чтобы увидеть прогресс по типам ошибок.</div>';
+    return;
+  }
+
   const grouped = items.reduce((acc, item) => {
     if (!acc[item.type]) {
       acc[item.type] = { type: item.type, count: 0 };
